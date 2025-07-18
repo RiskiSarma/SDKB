@@ -1,0 +1,22 @@
+{
+  "builds": [
+    {
+      "src": "index.php",
+      "use": "@vercel/php"
+    },
+    {
+      "src": "app.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/index.php"
+    },
+    {
+      "src": "/api/(.*)",
+      "dest": "/app.py"
+    }
+  ]
+}
