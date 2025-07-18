@@ -44,10 +44,10 @@
                                 <a class="nav-link ps-2 <?php echo (isset($_GET['x']) && $_GET['x'] == 'data_aktual') ? 'active link-light' : 'link-dark'; ?>"
                                 href="data_aktual"><i class="bi bi-database"></i> Data Aktual</a>
                             </li>
-                            <li class="nav-item">
+                            <!-- <li class="nav-item">
                                 <a class="nav-link ps-2 <?php echo (isset($_GET['x']) && $_GET['x'] == 'panduan') ? 'active link-light' : 'link-dark'; ?>"
                                 href="panduan"><i class="bi bi-book"></i> Panduan Assessment</a>
-                            </li>
+                            </li> -->
                         <?php } ?>
 
                         <!-- Menu untuk Level 2 (Orang Tua) -->

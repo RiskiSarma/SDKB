@@ -1,0 +1,43 @@
+{
+    "preprocessing_info": {
+        "original_samples": 80000,
+        "cleaned_samples": 53229,
+        "balanced_samples": 53226,
+        "balancing_method": "RandomUnderSampler",
+        "normalization_method": "StandardScaler"
+    },
+    "class_mapping": {
+        "under growth": 1,
+        "normal": 0
+    },
+    "class_distribution": {
+        "original": {
+            "0.0": 26616,
+            "1.0": 26613
+        },
+        "balanced": {
+            "0": 26613,
+            "1": 26613
+        }
+    },
+    "feature_info": {
+        "features": [
+            "age",
+            "Motorik Kasar",
+            "Motorik Halus",
+            "Komunikasi/Bahasa Lisan",
+            "Ekspresif",
+            "Menyimak",
+            "Kemampuan Pra Akademik",
+            "Membaca/Menulis",
+            "Sosial Skill"
+        ],
+        "n_features": 9
+    },
+    "rating_mapping": {
+        "excellent": 4,
+        "good": 3,
+        "fair": 2,
+        "poor": 1
+    }
+}

@@ -153,6 +153,7 @@
                     </div>
                 </div>
             </div>
+<!-- modal edit siswa -->
             <div class="modal fade" id="ModalEdit<?php echo $row['student_id']?>" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-fullscreen-md-down">
         <div class="modal-content">
@@ -172,12 +173,11 @@
                         </div>
                         <div class="col-lg-6">
                             <div class="form-floating mb-3">
-                                <select class="form-select" aria-label="Pilih Kelas" name="kelas" required>
-                                    <option value="1" <?php echo ($row['class'] == '1') ? 'selected' : ''; ?>>Kelas 1</option>
-                                    <option value="2" <?php echo ($row['class'] == '2') ? 'selected' : ''; ?>>Kelas 2</option>
-                                    <option value="3" <?php echo ($row['class'] == '3') ? 'selected' : ''; ?>>Kelas 3</option>
-                                </select>
+                                <input type="text" class="form-control" id="kelas" placeholder="kelas" name="kelas" value="<?php echo $row['class']?>" required>
                                 <label for="kelas">Kelas</label>
+                                <div class="invalid-feedback">
+                                    Pilih kelas
+                                </div>
                             </div>
                         </div>
                     </div>

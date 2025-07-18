@@ -1,299 +1,354 @@
 import pandas as pd
 import numpy as np
-from sklearn.model_selection import GridSearchCV, cross_val_score
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix, roc_auc_score, precision_recall_curve
-from imblearn.over_sampling import SMOTE
-from sklearn.tree import plot_tree
-from sklearn.preprocessing import StandardScaler
 import matplotlib.pyplot as plt
+import seaborn as sns
+import json
 import joblib
-import os
 
-# 1️⃣ Kumpulkan data siswa
-data = pd.read_csv("Train_Data.csv")
-print("✅ Data siswa berhasil dikumpulkan!")
-print(f"📊 Jumlah data: {data.shape[0]} siswa dengan {data.shape[1]} kolom")
+from sklearn.model_selection import train_test_split, GridSearchCV, cross_val_score
+from sklearn.preprocessing import StandardScaler
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.metrics import (
+    accuracy_score, roc_auc_score, classification_report,
+    confusion_matrix, roc_curve, precision_recall_curve
+)
+from imblearn.over_sampling import SMOTE
 
-# 2️⃣ Ekstrak indikator perkembangan
-# Konversi skor kualitatif menjadi numerik (jika belum)
-skor_map = {"excellent": 4, "good": 3, "fair": 2, "poor": 1}
+# 1️⃣ Load Data
+print("🔄 Memuat data untuk sistem deteksi dini...")
+data = pd.read_csv("Converted_Child_Growth.csv")
+print(f"✅ Data berhasil dimuat: {data.shape[0]} sampel, {data.shape[1]} fitur")
 
-# Daftar indikator berdasarkan domain
-indikator_kognitif = ["Kemampuan Pra Akademik", "Membaca/Menulis", "Sosial Skill"]
-indikator_bahasa = ["Komunikasi/Bahasa Lisan", "Ekspresif", "Menyimak"]
-indikator_motorik = ["Motorik Kasar", "Motorik Halus"]
-
-print("✅ Indikator perkembangan berhasil diekstrak:")
-print(f"👉 Kognitif: {', '.join(indikator_kognitif)}")
-print(f"👉 Bahasa: {', '.join(indikator_bahasa)}")
-print(f"👉 Motorik: {', '.join(indikator_motorik)}")
-
-# Pastikan semua kolom indikator dalam format numerik
-# Konversi kolom string ke numerik jika diperlukan
-semua_indikator = indikator_kognitif + indikator_bahasa + indikator_motorik
-for indikator in semua_indikator:
-    if indikator in data.columns:
-        # Cek apakah kolom berisi string
-        if data[indikator].dtype == 'object':
-            # Jika ya, konversi ke numerik dengan mapping
-            data[indikator] = data[indikator].map(skor_map)
-            print(f"✅ Mengkonversi kolom '{indikator}' ke numerik")
-
-# Periksa missing values dan tangani
+# 2️⃣ Tangani Missing Values
+print("\n🔍 Memeriksa dan menangani missing values...")
 if data.isnull().sum().sum() > 0:
-    print(f"⚠️ Terdapat {data.isnull().sum().sum()} nilai yang hilang.")
-    # Menampilkan kolom dengan nilai yang hilang
-    print(data.isnull().sum()[data.isnull().sum() > 0])
-    # Menangani missing values
+    missing_info = data.isnull().sum()
+    print(f"⚠️  Ditemukan missing values pada kolom: {missing_info[missing_info > 0].to_dict()}")
     data = data.fillna(data.median())
-    print("✅ Missing values ditangani dengan nilai median.")
+    print("✅ Missing values telah ditangani menggunakan median imputation")
+else:
+    print("✅ Tidak ada missing values ditemukan")
 
-# 3️⃣ Data Exploration - Periksa distribusi target
-print("\n📊 Distribusi Target (growth):")
-target_counts = data["growth"].value_counts()
-print(target_counts)
-print(f"Persentase: {(target_counts/len(data)*100).round(2)}")
+# 3️⃣ Eksplorasi Awal
+print("\n📊 Analisis distribusi kelas untuk deteksi dini:")
+print("Target distribution (growth status):")
+growth_counts = data["growth"].value_counts()
+growth_percentages = (growth_counts / len(data) * 100).round(2)
+for status, count in growth_counts.items():
+    status_name = "Terlambat Tumbuh" if status == 0 else "Normal" if status == 1 else "Kelebihan Tumbuh"
+    print(f"  {status_name} (kode {status}): {count} sampel ({growth_percentages[status]}%)")
 
-# Memisahkan fitur dan target
-# Simpan daftar nama kolom yang digunakan sebagai fitur
-feature_columns = data.drop(columns=["growth"]).columns.tolist()
+# 4️⃣ Pisahkan Fitur dan Target
+print("\n🎯 Mempersiapkan data untuk deteksi dini...")
 X = data.drop(columns=["growth"])
 y = data["growth"]
 
-# Konversi target menjadi biner (Terlambat: 0, Normal: 1)
-y_binary = y.map({0: 0, 1: 1, 2: 1})  # Menggabungkan normal dan over growth
-print(f"✅ Data dipilah berdasarkan domain, dengan {X.shape[1]} indikator")
+# Filter untuk deteksi dini: fokus pada 'normal' (0) vs 'terlambat' (1)
+# Sesuai preprocessing: 0 = normal, 1 = terlambat (perlu deteksi dini)
+mask = (y == 0) | (y == 1)
+X = X[mask]
+y = y[mask]
+y_binary = y.copy()  # Tidak perlu remapping: 0 = normal, 1 = terlambat
 
-# Distribusi target setelah konversi
-print("\n📊 Distribusi Target Setelah Konversi ke Biner:")
-target_binary_counts = y_binary.value_counts()
-print(target_binary_counts)
-print(f"Persentase: {(target_binary_counts/len(y_binary)*100).round(2)}")
+print(f"✅ Data disiapkan untuk deteksi dini:")
+print(f"  - Kelas 1 (Terlambat - Perlu Deteksi Dini): {sum(y_binary == 1)} sampel")
+print(f"  - Kelas 0 (Normal): {sum(y_binary == 0)} sampel")
 
-# PERUBAHAN: Gunakan seluruh data training untuk training (tidak ada split)
-X_train = X
-y_train = y_binary
+# 5️⃣ Split Train-Test
+print("\n🔄 Membagi data untuk pelatihan dan pengujian...")
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y_binary, test_size=0.2, stratify=y_binary, random_state=42
+)
 
-# Standardisasi fitur numerik
+print(f"📊 Distribusi data setelah pembagian:")
+print(f"  Data pelatihan: {X_train.shape[0]} sampel ({X_train.shape[0]/len(X)*100:.1f}%)")
+print(f"  Data pengujian: {X_test.shape[0]} sampel ({X_test.shape[0]/len(X)*100:.1f}%)")
+print(f"  Total fitur: {X_train.shape[1]}")
+
+print(f"\n📊 Distribusi target untuk deteksi dini:")
+train_dist = pd.Series(y_train).value_counts()
+test_dist = pd.Series(y_test).value_counts()
+print(f"  Training - Terlambat: {train_dist.get(1, 0)}, Normal: {train_dist.get(0, 0)}")
+print(f"  Testing - Terlambat: {test_dist.get(1, 0)}, Normal: {test_dist.get(0, 0)}")
+
+# 6️⃣ Standardisasi
+print("\n🔄 Melakukan standardisasi fitur...")
 scaler = StandardScaler()
 X_train_scaled = scaler.fit_transform(X_train)
+X_test_scaled = scaler.transform(X_test)
+print("✅ Standardisasi selesai")
 
-# Konversi kembali ke DataFrame untuk mempertahankan nama kolom
-X_train_scaled = pd.DataFrame(X_train_scaled, columns=X_train.columns)
-
-# 4️⃣ Seimbangkan data dengan SMOTE - menggunakan subsample untuk mengatasi masalah memori
-# MODIFIKASI: Gunakan sampling_strategy yang lebih kecil untuk mengurangi jumlah data
-smote = SMOTE(random_state=42, sampling_strategy=0.6)  # Kurangi dari 0.8 ke 0.6
+# 7️⃣ SMOTE untuk Menangani Ketidakseimbangan Data
+print("\n⚖️  Menangani ketidakseimbangan data dengan SMOTE...")
+print(f"  Sebelum SMOTE: {len(y_train)} sampel")
+smote = SMOTE(random_state=42)
 X_train_resampled, y_train_resampled = smote.fit_resample(X_train_scaled, y_train)
-print(f"✅ Data telah diseimbangkan menggunakan SMOTE")
-print(f"👉 Jumlah data training sebelum SMOTE: {len(y_train)}")
-print(f"👉 Jumlah data training setelah SMOTE: {len(y_train_resampled)}")
-print(f"👉 Distribusi kelas setelah SMOTE: {pd.Series(y_train_resampled).value_counts()}")
+print(f"  Setelah SMOTE: {len(y_train_resampled)} sampel")
 
-# 5️⃣ Terapkan metode Decision Tree CART dengan parameter yang lebih sederhana
-model = DecisionTreeClassifier(random_state=42)
+resampled_dist = pd.Series(y_train_resampled).value_counts()
+resampled_pct = (resampled_dist / len(y_train_resampled) * 100).round(1)
+print(f"  Distribusi setelah SMOTE:")
+print(f"    Terlambat (perlu deteksi dini): {resampled_dist.get(1, 0)} ({resampled_pct.get(1, 0)}%)")
+print(f"    Normal: {resampled_dist.get(0, 0)} ({resampled_pct.get(0, 0)}%)")
 
-# MODIFIKASI: Sederhanakan grid parameter untuk mengurangi kombinasi dan penggunaan memori
+# 8️⃣ GridSearchCV untuk Optimasi Decision Tree CART
+print("\n🔍 Mencari parameter optimal untuk Decision Tree CART...")
 param_grid = {
-    'max_depth': [5, 10, None],  # Kurangi jumlah opsi
-    'min_samples_split': [10, 20],  # Kurangi jumlah opsi
-    'min_samples_leaf': [5, 10],  # Kurangi jumlah opsi
-    'max_features': ['sqrt', None],  # Kurangi jumlah opsi
-    'ccp_alpha': [0.0, 0.01]  # Kurangi jumlah opsi
+    'max_depth': [5, 10, 15, 20],
+    'min_samples_split': [2, 5, 10],
+    'min_samples_leaf': [1, 2, 4],
+    'max_features': ['sqrt', 'log2', None],
+    'ccp_alpha': [0.0, 0.001, 0.01],
+    'criterion': ['gini', 'entropy']
 }
 
-print("🔍 Mencari parameter optimal untuk model Decision Tree CART...")
-# MODIFIKASI: Tambahkan n_jobs=-1 untuk paralelisasi dan kurangi cv untuk mengurangi memori
 grid_search = GridSearchCV(
-    estimator=model, 
-    param_grid=param_grid, 
-    cv=3,  # Kurangi dari 5 ke 3
+    DecisionTreeClassifier(random_state=42),
+    param_grid,
+    cv=5,
     scoring='roc_auc',
-    n_jobs=-1,  # Paralelisasi
+    n_jobs=-1,
     verbose=1
 )
 
-# MODIFIKASI: Handle memory error dengan membatasi ukuran data jika diperlukan
-try:
-    grid_search.fit(X_train_resampled, y_train_resampled)
-except MemoryError:
-    # Jika terjadi MemoryError, kurangi ukuran sampel
-    print("⚠️ Terjadi Memory Error! Mengurangi ukuran dataset...")
-    
-    # Ambil sampel acak 50% dari data
-    sample_indices = np.random.choice(
-        len(X_train_resampled), 
-        size=int(len(X_train_resampled) * 0.5), 
-        replace=False
-    )
-    X_sample = X_train_resampled.iloc[sample_indices]
-    y_sample = y_train_resampled.iloc[sample_indices]
-    
-    # Jalankan grid search pada sampel yang lebih kecil
-    grid_search.fit(X_sample, y_sample)
-    print("✅ Grid search dijalankan pada sampel data yang lebih kecil")
-else:
-    print("✅ Grid search berhasil dijalankan pada semua data")
-
+grid_search.fit(X_train_resampled, y_train_resampled)
 best_model = grid_search.best_estimator_
-print(f"✅ Model Decision Tree CART terbaik telah dilatih")
-print(f"👉 Parameter terbaik: {grid_search.best_params_}")
-print(f"👉 Skor validasi terbaik: {grid_search.best_score_:.4f}")
 
-# 6️⃣ Evaluasi model dengan cross-validation - menggunakan CV yang lebih kecil
-cv_scores = cross_val_score(best_model, X_train_resampled, y_train_resampled, cv=3, scoring='accuracy')
-print(f"📊 Rata-rata Akurasi Cross Validation: {np.mean(cv_scores) * 100:.2f}%")
-print(f"👉 Skor individu: {[f'{score * 100:.2f}%' for score in cv_scores]}")
+print("✅ Model deteksi dini terbaik telah dilatih")
+print(f"  Parameter terbaik: {grid_search.best_params_}")
+print(f"  ROC-AUC Score: {grid_search.best_score_:.4f}")
 
-# Evaluasi pada data latih
+# 9️⃣ Evaluasi Model pada Data Training
+print("\n📊 Evaluasi model deteksi dini pada data training...")
 y_train_pred = best_model.predict(X_train_resampled)
-train_accuracy = accuracy_score(y_train_resampled, y_train_pred)
-print(f"📊 Akurasi Model pada Data Latih: {train_accuracy * 100:.2f}%")
-
-# Tampilkan laporan klasifikasi pada data latih
-print("\n📜 Laporan Klasifikasi (Data Latih):")
-train_class_report = classification_report(y_train_resampled, y_train_pred, target_names=["Terlambat", "Normal"], zero_division=1)
-print(train_class_report)
-
-# Generate and display confusion matrix
-print("\n📊 Confusion Matrix (Data Latih):")
-train_cm = confusion_matrix(y_train_resampled, y_train_pred)
-print(train_cm)
-
-# Calculate and display normalized confusion matrix
-train_cm_normalized = train_cm.astype('float') / train_cm.sum(axis=1)[:, np.newaxis]
-print("\n📊 Normalized Confusion Matrix (Data Latih):")
-print(np.round(train_cm_normalized, 2))
-
-# Visualize confusion matrix
-plt.figure(figsize=(10, 8))
-classes = ["Terlambat", "Normal"]
-plt.imshow(train_cm, interpolation='nearest', cmap=plt.cm.Blues)
-plt.title('Confusion Matrix - Decision Tree CART')
-plt.colorbar()
-tick_marks = np.arange(len(classes))
-plt.xticks(tick_marks, classes, rotation=45)
-plt.yticks(tick_marks, classes)
-
-# Add text annotations in the confusion matrix
-thresh = train_cm.max() / 2.0
-for i, j in np.ndindex(train_cm.shape):
-    plt.text(j, i, f"{train_cm[i, j]}\n({train_cm_normalized[i, j]:.2%})",
-             horizontalalignment="center",
-             color="white" if train_cm[i, j] > thresh else "black")
-
-plt.tight_layout()
-plt.ylabel('True label')
-plt.xlabel('Predicted label')
-plt.savefig("confusion_matrix.png")
-print("✅ Visualisasi Confusion Matrix telah disimpan sebagai 'confusion_matrix.png'")
-
-# 7️⃣ Menentukan threshold optimal menggunakan precision-recall curve pada data latih
 y_train_proba = best_model.predict_proba(X_train_resampled)[:, 1]
-precisions, recalls, thresholds = precision_recall_curve(y_train_resampled, y_train_proba)
+train_accuracy = accuracy_score(y_train_resampled, y_train_pred)
+roc_auc = roc_auc_score(y_train_resampled, y_train_proba)
+cv_scores = cross_val_score(best_model, X_train_resampled, y_train_resampled, cv=5, scoring='accuracy')
 
-# Hitung F1 score untuk setiap threshold
-f1_scores = 2 * (precisions[:-1] * recalls[:-1]) / (precisions[:-1] + recalls[:-1] + 1e-10)
+print(f"  Akurasi Training: {train_accuracy * 100:.2f}%")
+print(f"  ROC-AUC Score: {roc_auc:.4f}")
+print(f"  Cross Validation Accuracy: {np.mean(cv_scores) * 100:.2f}% ± {np.std(cv_scores) * 100:.2f}%")
+
+# 🔟 Menentukan ROC & Threshold Optimal untuk Deteksi Dini
+print("\n🎯 Menentukan threshold optimal untuk deteksi dini...")
+fpr, tpr, thresholds = roc_curve(y_train_resampled, y_train_proba)
+# Untuk deteksi dini, kita ingin sensitivitas tinggi (recall tinggi)
+f1_scores = 2 * (tpr * (1 - fpr)) / (tpr + (1 - fpr) + 1e-6)
 optimal_idx = np.argmax(f1_scores)
 optimal_threshold = thresholds[optimal_idx]
+print(f"  Threshold optimal untuk deteksi dini: {optimal_threshold:.4f}")
+print(f"  Sensitivitas pada threshold ini: {tpr[optimal_idx]:.4f}")
+print(f"  Spesifisitas pada threshold ini: {1-fpr[optimal_idx]:.4f}")
 
-print(f"\n📊 Threshold Optimal: {optimal_threshold:.4f}")
-print(f"👉 Presisi pada threshold optimal: {precisions[optimal_idx]:.4f}")
-print(f"👉 Recall pada threshold optimal: {recalls[optimal_idx]:.4f}")
-print(f"👉 F1-score pada threshold optimal: {f1_scores[optimal_idx]:.4f}")
+# 1️⃣1️⃣ Evaluasi pada Data Test
+print("\n📊 Evaluasi sistem deteksi dini pada data test...")
+y_test_pred = (best_model.predict_proba(X_test_scaled)[:, 1] >= optimal_threshold).astype(int)
+y_test_proba = best_model.predict_proba(X_test_scaled)[:, 1]
 
-# Visualisasi distribusi threshold
-plt.figure(figsize=(12, 8))
-plt.plot(thresholds, precisions[:-1], 'b--', label='Precision')
-plt.plot(thresholds, recalls[:-1], 'g-', label='Recall')
-plt.plot(thresholds, f1_scores, 'r-.', label='F1 Score')
-plt.axvline(x=optimal_threshold, color='purple', linestyle=':', label=f'Optimal Threshold = {optimal_threshold:.4f}')
+test_accuracy = accuracy_score(y_test, y_test_pred)
+test_roc_auc = roc_auc_score(y_test, y_test_proba)
+
+print(f"  Akurasi Deteksi pada Data Test: {test_accuracy * 100:.2f}%")
+print(f"  ROC-AUC Score pada Data Test: {test_roc_auc:.4f}")
+
+# Classification Report untuk Deteksi Dini
+print("\n📄 Laporan Klasifikasi Sistem Deteksi Dini:")
+print(classification_report(y_test, y_test_pred, target_names=["Normal", "Terlambat"]))
+
+# Confusion Matrix untuk Deteksi Dini
+cm = confusion_matrix(y_test, y_test_pred)
+print("\n📊 Confusion Matrix Sistem Deteksi Dini:")
+print("     Prediksi")
+print("Aktual   Normal  Deteksi")
+print(f"Normal     {cm[0,0]:3d}     {cm[0,1]:3d}")
+print(f"Deteksi    {cm[1,0]:3d}     {cm[1,1]:3d}")
+
+# Interpretasi untuk deteksi dini
+tn, fp, fn, tp = cm.ravel()
+sensitivity = tp / (tp + fn)  # Recall untuk kelas positif
+specificity = tn / (tn + fp)  # Recall untuk kelas negatif
+precision = tp / (tp + fp)    # Precision untuk kelas positif
+
+print(f"\n📊 Metrik Deteksi Dini:")
+print(f"  Sensitivitas (Recall): {sensitivity:.4f} - Kemampuan mendeteksi anak yang perlu intervensi")
+print(f"  Spesifisitas: {specificity:.4f} - Kemampuan mengidentifikasi anak normal")
+print(f"  Precision: {precision:.4f} - Ketepatan deteksi dini")
+
+# Visualisasi Confusion Matrix
+plt.figure(figsize=(8, 6))
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
+            xticklabels=["Normal", "Terlambat"], 
+            yticklabels=["Normal", "Terlambat"])
+plt.title("Confusion Matrix - Sistem Deteksi Dini Tumbuh Kembang Anak")
+plt.ylabel("Kelas Aktual")
+plt.xlabel("Kelas Terdeteksi")
+plt.tight_layout()
+plt.savefig("confusion_matrix_deteksi_dini.png", dpi=300)
+plt.close()
+print("✅ Confusion matrix disimpan: confusion_matrix_deteksi_dini.png")
+
+# Precision-Recall Curve
+precisions, recalls, thresholds_pr = precision_recall_curve(y_test, y_test_proba)
+f1_scores_test = 2 * (precisions[:-1] * recalls[:-1]) / (precisions[:-1] + recalls[:-1] + 1e-6)
+plt.figure(figsize=(10, 6))
+plt.plot(thresholds_pr, precisions[:-1], 'b--', label='Precision', linewidth=2)
+plt.plot(thresholds_pr, recalls[:-1], 'g-', label='Recall (Sensitivitas)', linewidth=2)
+plt.plot(thresholds_pr, f1_scores_test, 'r-.', label='F1 Score', linewidth=2)
+plt.axvline(x=optimal_threshold, color='purple', linestyle=':', linewidth=2, 
+            label=f'Threshold Optimal = {optimal_threshold:.4f}')
 plt.xlabel('Threshold')
 plt.ylabel('Score')
-plt.title('Precision, Recall dan F1 Score berdasarkan Threshold')
+plt.title('Kurva Precision-Recall untuk Deteksi Dini')
 plt.legend()
-plt.grid(True)
-plt.savefig("threshold_evaluation.png")
-print("✅ Visualisasi Threshold telah disimpan sebagai 'threshold_evaluation.png'")
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("precision_recall_deteksi_dini.png", dpi=300)
+plt.close()
+print("✅ Precision-Recall curve disimpan: precision_recall_deteksi_dini.png")
 
-# 8️⃣ Visualisasikan pohon keputusan
-plt.figure(figsize=(20, 10))
+# 1️⃣2️⃣ Visualisasi Decision Tree
+plt.figure(figsize=(24, 12))
 plot_tree(
-    best_model,  # Model Decision Tree yang sudah di-training
-    feature_names=X.columns,  # Nama fitur
-    class_names=["Terlambat", "Normal"],  # Nama kelas sesuai dengan urutan 0, 1
-    filled=True,  # Warna node berdasarkan kelas
-    rounded=True,  # Bentuk node bulat
-    proportion=True,  # Tampilkan proporsi sampel di setiap node
-    max_depth=3,  # Batasi kedalaman pohon yang ditampilkan
-    fontsize=10  # Ukuran font
+    best_model,
+    filled=True,
+    feature_names=X.columns,
+    class_names=["Normal", "Terlambat"],
+    rounded=True,
+    proportion=True,
+    max_depth=4,
+    fontsize=12,
+    impurity=True
 )
-plt.title("Visualisasi Decision Tree Klasifikasi Keterlambatan Belajar", fontsize=16)
-plt.savefig("visualisasi_decision_tree.png")
-print("✅ Visualisasi Decision Tree telah disimpan sebagai 'visualisasi_decision_tree.png'")
+plt.title("Visualisasi Decision Tree CART - Sistem Deteksi Dini Tumbuh Kembang Anak", fontsize=16)
+plt.tight_layout()
+plt.savefig("decision_tree_deteksi_dini.png", dpi=300, bbox_inches='tight')
+plt.close()
+print("✅ Visualisasi decision tree disimpan: decision_tree_deteksi_dini.png")
 
-# 9️⃣ Tampilkan hasil pelatihan model
-print("\n📑 HASIL PELATIHAN MODEL KLASIFIKASI KETERLAMBATAN BELAJAR 📑")
-print("=" * 50)
-print(f"Total Data Training yang Digunakan: {len(y_train_resampled)}")
+# 1️⃣3️⃣ Feature Importance untuk Deteksi Dini
+importances = pd.Series(best_model.feature_importances_, index=X.columns)
+top_features = importances.sort_values(ascending=False).head(10)
 
-# Hitungan jumlah data per kategori
-jumlah_normal = np.sum(y_train_resampled == 1)
-jumlah_terlambat = np.sum(y_train_resampled == 0)
+plt.figure(figsize=(12, 8))
+top_features.sort_values().plot(kind='barh', color='skyblue', edgecolor='navy')
+plt.title("Top 10 Fitur Penting untuk Deteksi Dini Tumbuh Kembang", fontsize=14)
+plt.xlabel("Tingkat Kepentingan")
+plt.tight_layout()
+plt.savefig("feature_importance_deteksi_dini.png", dpi=300)
+plt.close()
+print("✅ Feature importance disimpan: feature_importance_deteksi_dini.png")
 
-print(f"Jumlah Data Kategori Normal: {jumlah_normal} ({jumlah_normal/len(y_train_resampled)*100:.1f}%)")
-print(f"Jumlah Data Kategori Terlambat: {jumlah_terlambat} ({jumlah_terlambat/len(y_train_resampled)*100:.1f}%)")
-print("=" * 50)
+print(f"\n🎯 Top 5 Fitur Penting untuk Deteksi Dini:")
+for i, (feature, importance) in enumerate(top_features.head(5).items(), 1):
+    print(f"  {i}. {feature}: {importance:.4f}")
 
-# Skor ketepatan klasifikasi pada data latih
-print(f"Akurasi Klasifikasi (Data Latih): {train_accuracy * 100:.2f}%")
-print(f"Cross-Validation Score: {np.mean(cv_scores) * 100:.2f}%")
-print("=" * 50)
+# 1️⃣4️⃣ Simpan Model & Metadata
+print("\n💾 Menyimpan model dan metadata...")
+joblib.dump(best_model, "model_deteksi_dini_cart.pkl")
+joblib.dump(scaler, "scaler_deteksi_dini.pkl")
 
-# Indikator yang paling berpengaruh
-feature_importances = pd.DataFrame({
-    'Indikator': X.columns,
-    'Importance': best_model.feature_importances_
-}).sort_values('Importance', ascending=False)
-
-print("TOP 5 INDIKATOR PALING BERPENGARUH:")
-print(feature_importances.head(5).to_string(index=False))
-print("=" * 50)
-
-# Menyimpan model
-# Menyimpan model
-model_path = "decision_tree_cart_model.pkl"
-joblib.dump(best_model, model_path)
-print(f"✅ Model berhasil disimpan di: {os.path.abspath(model_path)}")
-
-# Simpan juga threshold optimal untuk digunakan saat prediksi
-threshold_data = {
-    'optimal_threshold': optimal_threshold,
-    'precision': precisions[optimal_idx],
-    'recall': recalls[optimal_idx],
-    'f1_score': f1_scores[optimal_idx],
-    'feature_columns': feature_columns,  # Simpan nama kolom fitur juga
-    'scaler': scaler,  # Simpan scaler untuk preprocessing data baru
-    # Tambahkan informasi penting lainnya yang diperlukan untuk prediksi
-    'feature_importances': dict(zip(X.columns, best_model.feature_importances_)),
+metadata = {
+    'system_type': 'Early Detection System',
+    'target_condition': 'Deteksi Dini Terlambat Tumbuh',
+    'model': 'DecisionTreeClassifier (CART)',
+    'scaler': 'StandardScaler',
+    'optimal_threshold': float(optimal_threshold),
+    'detection_metrics': {
+        'sensitivity': float(sensitivity),
+        'specificity': float(specificity),
+        'precision': float(precision),
+        'f1_score': float(2 * precision * sensitivity / (precision + sensitivity))
+    },
+    'performance_metrics': {
+        'train_accuracy': float(train_accuracy),
+        'test_accuracy': float(test_accuracy),
+        'cv_mean': float(np.mean(cv_scores)),
+        'cv_std': float(np.std(cv_scores)),
+        'train_roc_auc': float(roc_auc),
+        'test_roc_auc': float(test_roc_auc)
+    },
+    'feature_info': {
+        'feature_names': X.columns.tolist(),
+        'feature_importances': dict(zip(X.columns, best_model.feature_importances_)),
+        'top_5_features': dict(top_features.head(5)),
+        'n_features': X.shape[1]
+    },
     'model_params': best_model.get_params(),
-    'class_names': ["Terlambat", "Normal"]
+    'class_mapping': {
+        0: "Normal",
+        1: "Terlambat"
+    },
+    'training_info': {
+        'original_samples': int(len(data)),
+        'processed_samples': int(len(X)),
+        'training_samples': int(len(X_train)),
+        'test_samples': int(len(X_test)),
+        'resampled_samples': int(len(y_train_resampled)),
+        'smote_applied': True
+    },
+    'interpretation': {
+        'purpose': 'Sistem deteksi dini untuk mengidentifikasi anak yang berisiko mengalami keterlambatan tumbuh kembang',
+        'threshold_rationale': f'Threshold {optimal_threshold:.4f} dipilih untuk memaksimalkan deteksi dini dengan menjaga keseimbangan sensitivitas dan spesifisitas',
+        'clinical_relevance': 'Model ini dapat membantu tenaga kesehatan dalam mengidentifikasi anak yang membutuhkan intervensi dini'
+    }
 }
-threshold_path = "optimal_threshold.pkl"
-joblib.dump(threshold_data, threshold_path)
-print(f"✅ Threshold optimal berhasil disimpan di: {os.path.abspath(threshold_path)}")
 
-# Tambahkan verifikasi bahwa file berhasil disimpan dengan benar
-try:
-    # Verifikasi file tersimpan
-    loaded_threshold = joblib.load(threshold_path)
-    print(f"✅ Verifikasi threshold berhasil: {list(loaded_threshold.keys())}")
-    print(f"   Nilai threshold optimal: {loaded_threshold['optimal_threshold']:.4f}")
-    if 'feature_columns' in loaded_threshold and 'scaler' in loaded_threshold:
-        print(f"   Jumlah fitur tersimpan: {len(loaded_threshold['feature_columns'])}")
-        print("   Scaler tersimpan dengan benar")
-    else:
-        print("⚠️ Beberapa data penting tidak tersimpan dengan benar!")
-except Exception as e:
-    print(f"⚠️ Gagal verifikasi file threshold: {e}")
+with open("metadata_deteksi_dini.json", "w") as f:
+    json.dump(metadata, f, indent=4)
+print("✅ Model dan metadata disimpan:")
+print("  - model_deteksi_dini_cart.pkl")
+print("  - scaler_deteksi_dini.pkl") 
+print("  - metadata_deteksi_dini.json")
+
+# 1️⃣5️⃣ Visualisasi ROC-AUC Curve
+plt.figure(figsize=(10, 8))
+plt.plot(fpr, tpr, label=f"ROC Curve (AUC = {roc_auc:.4f})", color='darkorange', linewidth=2)
+plt.plot([0, 1], [0, 1], linestyle="--", color='gray', alpha=0.7)
+plt.scatter(fpr[optimal_idx], tpr[optimal_idx], color='red', s=100, zorder=5,
+            label=f'Threshold Optimal ({optimal_threshold:.4f})')
+plt.xlabel("False Positive Rate (1 - Spesifisitas)")
+plt.ylabel("True Positive Rate (Sensitivitas)")
+plt.title("ROC-AUC Curve - Sistem Deteksi Dini Tumbuh Kembang Anak")
+plt.legend(loc="lower right")
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("roc_auc_deteksi_dini.png", dpi=300)
+plt.close()
+print("✅ ROC-AUC curve disimpan: roc_auc_deteksi_dini.png")
+
+# 1️⃣6️⃣ Visualisasi Cross Validation Accuracy
+plt.figure(figsize=(10, 6))
+plt.plot(range(1, 6), cv_scores, marker='o', linestyle='-', color='green', linewidth=2, markersize=8)
+plt.axhline(y=np.mean(cv_scores), color='red', linestyle='--', linewidth=2,
+            label=f'Rata-rata: {np.mean(cv_scores):.4f}')
+plt.fill_between(range(1, 6), cv_scores, alpha=0.3, color='green')
+plt.title("Cross Validation Accuracy - Sistem Deteksi Dini (5-Fold CV)")
+plt.xlabel("Fold ke-")
+plt.ylabel("Akurasi")
+plt.xticks(range(1, 6))
+plt.ylim(0, 1)
+plt.legend()
+plt.grid(True, alpha=0.3)
+plt.tight_layout()
+plt.savefig("cv_accuracy_deteksi_dini.png", dpi=300)
+plt.close()
+print("✅ Cross Validation Accuracy disimpan: cv_accuracy_deteksi_dini.png")
+
+# 1️⃣7️⃣ Ringkasan Hasil
+print("\n" + "="*80)
+print("🎯 RINGKASAN SISTEM DETEKSI DINI TUMBUH KEMBANG ANAK")
+print("="*80)
+print(f"📊 Akurasi Deteksi: {test_accuracy * 100:.2f}%")
+print(f"📊 ROC-AUC Score: {test_roc_auc:.4f}")
+print(f"📊 Sensitivitas (Deteksi Kasus Positif): {sensitivity:.4f}")
+print(f"📊 Spesifisitas (Identifikasi Normal): {specificity:.4f}")
+print(f"📊 Precision: {precision:.4f}")
+print(f"📊 Threshold Optimal: {optimal_threshold:.4f}")
+print(f"\n🔍 Fitur Paling Penting:")
+for i, (feature, importance) in enumerate(top_features.head(3).items(), 1):
+    print(f"  {i}. {feature}: {importance:.4f}")
+print(f"\n📈 Model berhasil dilatih dengan {len(y_train_resampled)} sampel training")
+print(f"📈 Model diuji dengan {len(y_test)} sampel testing")
+print("\n✅ Sistem deteksi dini siap digunakan untuk identifikasi anak yang berisiko!")
+print("="*80)

@@ -1,0 +1,15 @@
+=== Classification Report ===
+              precision    recall  f1-score   support
+
+         0.0       0.50      0.48      0.49      5323
+         1.0       0.50      0.51      0.50      5323
+
+    accuracy                           0.50     10646
+   macro avg       0.50      0.50      0.50     10646
+weighted avg       0.50      0.50      0.50     10646
+
+Akurasi: 49.63%
+ROC AUC: 0.4955
+
+Cross Validation ROC AUC: [0.50608217 0.504577   0.49772413 0.50486004 0.50458041]
+Rata-rata CV ROC AUC: 0.5036

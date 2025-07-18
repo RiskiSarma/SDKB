@@ -59,7 +59,7 @@
                     <input type="hidden" id="user-type" name="user_type" required>
                     <div class="mb-3 position-relative">
                         <i class="fas fa-envelope form-icon"></i>
-                        <input type="email" class="form-control form-input" id="email" name="email" placeholder="Email" required>
+                        <input type="email" class="form-control form-input" id="email" name="username" placeholder="Email" required>
                         <div class="invalid-feedback">
                             Masukkan email yang valid.
                         </div>
@@ -71,17 +71,13 @@
                             Masukkan password yang valid.
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-primary w-100">Login</button>
+                    <button type="submit" class="btn btn-primary w-100" name="submit_validate" value="tes">Login</button>
                 </form>
-                <div class="mt-4 text-center">
-                    <button id="toggle-form" class="btn btn-link text-decoration-none">Belum punya akun? Register</button>
-                </div>
             </div>
         </div>
     </div>
 
     <script>
-        let isLogin = true;
         let userType = '';
 
         function setUserType(type) {
@@ -93,117 +89,6 @@
             document.getElementById('teacher-btn').classList.toggle('btn-outline-primary', userType !== 'teacher');
         }
 
-        function toggleForm() {
-            isLogin = !isLogin;
-            document.getElementById('form-title').innerText = isLogin ? 'Login - Sistem Deteksi Perkembangan Anak' : 'Register - Sistem Deteksi Perkembangan Anak';
-            document.getElementById('toggle-form').innerText = isLogin ? 'Belum punya akun? Register' : 'Sudah punya akun? Login';
-            renderForm();
-        }
-
-        function renderForm() {
-            const form = document.getElementById('auth-form');
-            form.classList.remove('was-validated');
-            form.innerHTML = '';
-
-            if (isLogin) {
-                form.innerHTML += `
-                    <input type="hidden" id="user-type" name="user_type" required>
-                    <div class="mb-3 position-relative">
-                        <i class="fas fa-envelope form-icon"></i>
-                        <input name="username" type="email" class="form-control form-input" placeholder="Email" required>
-                        <div class="invalid-feedback">
-                            Masukkan email yang valid.
-                        </div>
-                    </div>
-                    <div class="mb-3 position-relative">
-                        <i class="fas fa-lock form-icon"></i>
-                        <input name="password" type="password" class="form-control form-input" id="password" placeholder="Password" required>
-                        <div class="invalid-feedback">
-                            Masukkan password yang valid.
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100" name="submit_validate" value="tes">Login</button>
-                `;
-            } else {
-                form.innerHTML += `
-                    <div class="mb-3 position-relative">
-                        <i class="fas fa-user form-icon"></i>
-                        <input type="text" class="form-control form-input" id="fullname" placeholder="Nama Lengkap" required>
-                        <div class="invalid-feedback">
-                            Masukkan nama lengkap.
-                        </div>
-                    </div>
-                    <div class="mb-3 position-relative">
-                        <i class="fas fa-envelope form-icon"></i>
-                        <input type="email" class="form-control form-input" id="email" placeholder="Email" required>
-                        <div class="invalid-feedback">
-                            Masukkan email yang valid.
-                        </div>
-                    </div>
-                    <div class="mb-3 position-relative">
-                        <i class="fas fa-phone form-icon"></i>
-                        <input type="tel" class="form-control form-input" id="phone" placeholder="Nomor Telepon" required>
-                        <div class="invalid-feedback">
-                            Masukkan nomor telepon yang valid.
-                        </div>
-                    </div>
-                `;
-
-                if (userType === 'parent') {
-                    form.innerHTML += `
-                        <div class="mb-3 position-relative">
-                            <i class="fas fa-user-circle form-icon"></i>
-                            <input type="text" class="form-control form-input" id="child-name" placeholder="Nama Anak" required>
-                            <div class="invalid-feedback">
-                                Masukkan nama anak.
-                            </div>
-                        </div>
-                        <div class="mb-3 position-relative">
-                            <input type="text" class="form-control form-input" id="child-nis" placeholder="NIS Anak" required>
-                            <div class="invalid-feedback">
-                                Masukkan NIS anak.
-                            </div>
-                        </div>
-                    `;
-                } else if (userType === 'teacher') {
-                    form.innerHTML += `
-                        <div class="mb-3 position-relative">
-                            <input type="text" class="form-control form-input" id="nip" placeholder="NIP" required>
-                            <div class="invalid-feedback">
-                                Masukkan NIP.
-                            </div>
-                        </div>
-                        <div class="mb-3 position-relative">
-                            <input type="text" class="form-control form-input" id="position" placeholder="Jabatan" required>
-                            <div class="invalid-feedback">
-                                Masukkan jabatan.
-                            </div>
-                        </div>
-                    `;
-                }
-
-                form.innerHTML += `
-                    <div class="mb-3 position-relative">
-                        <i class="fas fa-lock form-icon"></i>
-                        <input type="password" class="form-control form-input" id="password" placeholder="Password" required>
-                        <div class="invalid-feedback">
-                            Masukkan password yang valid.
-                        </div>
-                    </div>
-                    <div class="mb-3 position-relative">
-                        <i class="fas fa-lock form-icon"></i>
-                        <input type="password" class="form-control form-input" id="confirm-password" placeholder="Konfirmasi Password" required>
-                        <div class="invalid-feedback">
-                            Masukkan konfirmasi password yang valid.
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary w-100">Register</button>
-                `;
-            }
-        }
-
-        document.getElementById('toggle-form').addEventListener('click', toggleForm);
-
         document.getElementById('auth-form').addEventListener('submit', function(event) {
             if (!this.checkValidity() || userType === '') {
                 event.preventDefault();
@@ -214,8 +99,6 @@
             }
             this.classList.add('was-validated');
         });
-
-        renderForm();
     </script>
 </body>
 </html>

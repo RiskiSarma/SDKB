@@ -1,0 +1,63 @@
+{
+    "model": "DecisionTreeClassifier",
+    "scaler": "StandardScaler",
+    "optimal_threshold": 0.1,
+    "performance_metrics": {
+        "train_accuracy": 0.956934203728925,
+        "train_recall": 0.9902315314892218,
+        "cv_recall_mean": 0.4949983407612161,
+        "cv_recall_std": 0.00523794254952763,
+        "test_accuracy": 0.4953034003381552,
+        "test_recall": 0.4672177343603231,
+        "test_roc_auc": 0.4937258440106346
+    },
+    "feature_info": {
+        "feature_names": [
+            "age",
+            "Motorik Kasar",
+            "Motorik Halus",
+            "Komunikasi/Bahasa Lisan",
+            "Ekspresif",
+            "Menyimak",
+            "Kemampuan Pra Akademik",
+            "Membaca/Menulis",
+            "Sosial Skill"
+        ],
+        "feature_importances": {
+            "age": 0.15957335793737668,
+            "Motorik Kasar": 0.06414410444992759,
+            "Motorik Halus": 0.127827828614095,
+            "Komunikasi/Bahasa Lisan": 0.10658115071780286,
+            "Ekspresif": 0.15323440477398342,
+            "Menyimak": 0.11558802072780196,
+            "Kemampuan Pra Akademik": 0.042392647696087644,
+            "Membaca/Menulis": 0.14173485076332687,
+            "Sosial Skill": 0.0889236343195979
+        },
+        "n_features": 9
+    },
+    "model_params": {
+        "ccp_alpha": 0.0,
+        "class_weight": null,
+        "criterion": "gini",
+        "max_depth": 20,
+        "max_features": "sqrt",
+        "max_leaf_nodes": null,
+        "min_impurity_decrease": 0.0,
+        "min_samples_leaf": 1,
+        "min_samples_split": 2,
+        "min_weight_fraction_leaf": 0.0,
+        "monotonic_cst": null,
+        "random_state": 42,
+        "splitter": "best"
+    },
+    "class_names": [
+        "Under Growth",
+        "Normal"
+    ],
+    "training_info": {
+        "original_samples": 53229,
+        "resampled_samples": 42586,
+        "smote_applied": true
+    }
+}

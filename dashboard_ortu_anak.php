@@ -242,7 +242,7 @@
                             <p class="card-text">
                                 Berdasarkan hasil deteksi terbaru, anak Anda memerlukan perhatian tambahan pada beberapa area perkembangan. Silakan lihat rekomendasi yang diberikan di halaman hasil deteksi.
                             </p>
-                            <a href="hasil-deteksi.php" class="btn btn-warning btn-sm mt-2">
+                            <a href="hasil_deteksi_anak" class="btn btn-warning btn-sm mt-2">
                                 Lihat Rekomendasi
                             </a>
                         </div>

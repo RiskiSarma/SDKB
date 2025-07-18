@@ -47,8 +47,8 @@ $accuracy = ($total_data > 0) ? round(($correct_predictions / $total_data) * 100
                             <tr>
                                 <th scope="col">No</th>
                                 <th scope="col">Nama Siswa</th>
-                                <th scope="col">Prediksi Sistem</th>
-                                <th scope="col">Label Aktual</th>
+                                <th scope="col">Deteksi Sistem</th>
+                                <th scope="col">Data Real</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -65,7 +65,7 @@ $accuracy = ($total_data > 0) ? round(($correct_predictions / $total_data) * 100
                                     <select class="form-select" name="actual_label[<?php echo $row['student_id']; ?>]" required>
                                         <option value="" selected>-- Pilih --</option>
                                         <option value="Normal">Normal</option>
-                                        <option value="Perlu Pembelajaran Khusus">Perlu Pembelajaran Khusus</option>
+                                        <option value="Perlu Pembelajaran Khusus">Terlambat</option>
                                     </select>
                                 </td>
                             </tr>
